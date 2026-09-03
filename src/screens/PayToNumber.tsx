@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../store/AppContext';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { evaluateTransaction } from '../utils/riskEngine';
 
 type Step = 'input' | 'confirm_name' | 'amount';
 
 const PayToNumber: React.FC = () => {
   const navigate = useNavigate();
-  const { payees, addTransaction } = useAppContext();
-  
+  const { payees, transactions, addTransaction } = useAppContext();
+
   const [step, setStep] = useState<Step>('input');
   const [inputValue, setInputValue] = useState('');
   const [matchedPayee, setMatchedPayee] = useState<any>(null);
@@ -16,7 +17,7 @@ const PayToNumber: React.FC = () => {
 
   const handleNextFromInput = () => {
     if (!inputValue) return;
-    
+
     // Mock lookup: find payee by phone/UPI or just pick the first one if not found
     // For simplicity, we just look if it matches 'kirana@upi' or something, else random
     const found = payees.find(p => p.upi_id === inputValue || p.id === inputValue) || payees[0];
@@ -30,19 +31,42 @@ const PayToNumber: React.FC = () => {
 
   const handlePay = () => {
     if (!amount || isNaN(Number(amount))) return;
-    
-    // Add mock transaction
-    addTransaction({
+
+    const userHistory = transactions.filter(t => t.user_id === 'u1');
+    const transactionToEval = {
       id: `t_${Date.now()}`,
       user_id: 'u1',
       payee_id: matchedPayee.id,
       amount: Number(amount),
       timestamp: new Date().toISOString(),
-      tier: Number(amount) > 5000 ? 'high' : 'low',
-      flags: [],
-      status: 'completed'
+      status: 'completed' as const
+    };
+
+    // Simulate user typing a name differently from the registered payee name
+    // If they typed something that isn't a UPI id (no '@'), pass it as typedName
+    const typedName = !inputValue.includes('@') && isNaN(Number(inputValue)) ? inputValue : undefined;
+
+    const riskResult = evaluateTransaction({
+      transaction: transactionToEval,
+      userHistory,
+      payee: matchedPayee,
+      typedName
     });
-    
+
+    console.log('--- RISK ENGINE OUTPUT (PAY TO NUMBER) ---');
+    console.log('Transaction:', transactionToEval);
+    console.log('Score:', riskResult.totalScore);
+    console.log('Tier:', riskResult.tier);
+    console.log('Flags:', riskResult.flags);
+    console.log('Rules Triggered:', riskResult.rulesTriggered);
+    console.log('------------------------------------------');
+
+    addTransaction({
+      ...transactionToEval,
+      tier: riskResult.tier as any,
+      flags: riskResult.flags
+    });
+
     navigate('/');
   };
 
@@ -55,14 +79,14 @@ const PayToNumber: React.FC = () => {
           <label style={{ display: 'block', marginBottom: '0.5rem', color: '#aaa' }}>
             Enter Mobile Number or UPI ID
           </label>
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="e.g. 9876543210 or name@upi"
             autoFocus
           />
-          <button 
+          <button
             onClick={handleNextFromInput}
             style={{ width: '100%', marginTop: '1.5rem', padding: '1rem', fontSize: '1.2rem' }}
             disabled={!inputValue}
@@ -75,8 +99,8 @@ const PayToNumber: React.FC = () => {
       {step === 'confirm_name' && matchedPayee && (
         <div className="card" style={{ textAlign: 'center' }}>
           <div style={{ marginBottom: '2rem' }}>
-            <div style={{ 
-              width: '80px', height: '80px', borderRadius: '40px', 
+            <div style={{
+              width: '80px', height: '80px', borderRadius: '40px',
               backgroundColor: 'var(--primary-color)', color: '#000',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '2rem', fontWeight: 'bold', margin: '0 auto 1rem auto'
@@ -90,7 +114,7 @@ const PayToNumber: React.FC = () => {
               <span>Banking Name Verified</span>
             </div>
           </div>
-          
+
           <button onClick={handleConfirmName} style={{ width: '100%', padding: '1rem', fontSize: '1.2rem' }}>
             Yes, this is correct
           </button>
@@ -103,11 +127,11 @@ const PayToNumber: React.FC = () => {
       {step === 'amount' && matchedPayee && (
         <div className="card" style={{ textAlign: 'center' }}>
           <p style={{ color: '#aaa', marginBottom: '1rem' }}>Paying <strong>{matchedPayee.name}</strong></p>
-          
+
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '3rem', fontWeight: 'bold', color: 'var(--primary-color)', marginBottom: '2rem' }}>
             <span>₹</span>
-            <input 
-              type="number" 
+            <input
+              type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"

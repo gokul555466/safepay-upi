@@ -30,7 +30,7 @@ export interface Transaction {
   payee_id: string;
   amount: number;
   timestamp: string;
-  tier: 'low' | 'medium' | 'high';
+  tier: 'low' | 'medium' | 'high' | 'critical';
   flags: string[];
   status: 'pending' | 'completed' | 'failed';
 }
