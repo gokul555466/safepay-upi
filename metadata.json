@@ -1,0 +1,6 @@
+{
+  "name": "SafePay Mode",
+  "description": "A protected UPI payment companion designed to eliminate transaction scams, accidental transfers, and comprehension barriers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
